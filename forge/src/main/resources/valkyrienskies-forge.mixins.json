@@ -13,6 +13,7 @@
     "compat.modular_routers.MixinRouterMenu",
     "feature.forge_interact.MixinIForgePlayer",
     "feature.water_in_ships_entity.MixinEntity",
+    "feature.shipyard_entities.MixinPersistentEntitySectionManager",
     "world.level.block.FireMixin"
   ],
   "client": [

@@ -50,6 +50,8 @@ import org.valkyrienskies.mod.common.hooks.VSGameEvents
 import org.valkyrienskies.mod.common.item.PhysicsEntityCreatorItem
 import org.valkyrienskies.mod.common.item.ShipAssemblerItem
 import org.valkyrienskies.mod.common.item.ShipCreatorItem
+import org.valkyrienskies.mod.common.item.ShipGroupNoCollisionItem
+import org.valkyrienskies.mod.common.item.ShipPairNoCollisionItem
 import org.valkyrienskies.mod.compat.clothconfig.VSClothConfig
 
 @Mod(MOD_ID)
@@ -69,6 +71,8 @@ class ValkyrienSkiesModForge {
     private val SHIP_MOUNTING_ENTITY_REGISTRY: RegistryObject<EntityType<ShipMountingEntity>>
     private val PHYSICS_ENTITY_TYPE_REGISTRY: RegistryObject<EntityType<VSPhysicsEntity>>
     private val SHIP_ASSEMBLER_ITEM_REGISTRY: RegistryObject<Item>
+    private val SHIP_NOCLIP_ITEM_REGISTRY: RegistryObject<Item>
+    private val SHIP_NOCLIP_GROUP_ITEM_REGISTRY: RegistryObject<Item>
     private val TEST_HINGE_BLOCK_ENTITY_TYPE_REGISTRY: RegistryObject<BlockEntityType<TestHingeBlockEntity>>
 
     init {
@@ -158,6 +162,12 @@ class ValkyrienSkiesModForge {
 
         SHIP_ASSEMBLER_ITEM_REGISTRY =
             ITEMS.register("ship_assembler") { ShipAssemblerItem(Properties()) }
+
+        SHIP_NOCLIP_ITEM_REGISTRY =
+            ITEMS.register("ship_pair_noclip") { ShipPairNoCollisionItem(Properties()) }
+        SHIP_NOCLIP_GROUP_ITEM_REGISTRY =
+            ITEMS.register("ship_group_noclip") { ShipGroupNoCollisionItem(Properties()) }
+
         TEST_HINGE_BLOCK_ENTITY_TYPE_REGISTRY = BLOCK_ENTITIES.register("test_hinge_block_entity") {
             BlockEntityType.Builder.of(::TestHingeBlockEntity, TestHingeBlock).build(null)
         }

@@ -1,9 +1,11 @@
 package org.valkyrienskies.mod.mixin.mod_compat.create_big_cannons;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
@@ -34,20 +36,17 @@ public abstract class MixinCBCUtils {
         }
     }
 
-    @WrapOperation(
-        method = "playBlastLikeSoundOnServer",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/server/level/ServerPlayer;distanceToSqr(DDD)D"
-        )
+    @WrapMethod(
+        method = "playBlastLikeSoundOnServer"
     )
-    private static double mixinBlastLocation(ServerPlayer serverPlayer, double x, double y, double z, Operation<Double> original) {
-        if (VSGameUtilsKt.isBlockInShipyard(serverPlayer.level(), x, y, z)) {
-            Vector3d world = VSGameUtilsKt.toWorldCoordinates(serverPlayer.level(), x, y, z);
+    private static void mixinBlastLocation(final ServerLevel level, double x, double y, double z, final SoundEvent soundEvent,
+        final SoundSource soundSource, final float volume, final float pitch, final float airAbsorption, final Operation<Void> original) {
+        if (VSGameUtilsKt.isBlockInShipyard(level, x, y, z)) {
+            final Vector3d world = VSGameUtilsKt.toWorldCoordinates(level, x, y, z);
             x = world.x;
             y = world.y;
             z = world.z;
         }
-        return original.call(serverPlayer, x,y,z);
+        original.call(level, x, y, z, soundEvent, soundSource, volume, pitch, airAbsorption);
     }
 }

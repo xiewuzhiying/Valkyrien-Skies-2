@@ -54,8 +54,17 @@ private data class VSBlockStateInfo(
     val type: VSBlockType?,
 )
 
+private data class VSFluidStateInfo(
+    val id: ResourceLocation,
+    val priority: Int,
+    val density: Float,
+    val dragCoefficient: Float,
+    val type: VSBlockType?,
+)
+
 object MassDatapackResolver : BlockStateInfoProvider {
     private val map = hashMapOf<ResourceLocation, VSBlockStateInfo>()
+    private val fluidMap = hashMapOf<ResourceLocation, VSFluidStateInfo>()
     private val _solidBlockStates: MutableList<Lod1SolidBlockState> = ArrayList()
     private val _liquidBlockStates: MutableList<Lod1LiquidBlockState> = ArrayList()
     private val _blockStateData: MutableList<Triple<Lod1SolidBlockStateId, Lod1LiquidBlockStateId, Lod1BlockStateId>> = ArrayList()
@@ -63,8 +72,11 @@ object MassDatapackResolver : BlockStateInfoProvider {
 
     val loader get() = VSMassDataLoader()
 
+    private const val DEFAULT_MASS = 100.0
     private const val DEFAULT_ELASTICITY = 0.3
     private const val DEFAULT_FRICTION = 0.5
+    private const val DEFAULT_DENSITY = 100.0f
+    private const val DEFAULT_DRAG_COEFFICIENT = 0.3f
     // Unused for now, placeholder for later
     private const val DEFAULT_HARDNESS = 1.0
 
@@ -97,6 +109,7 @@ object MassDatapackResolver : BlockStateInfoProvider {
         ) {
             map.clear()
             tags.clear()
+            fluidMap.clear()
             objects?.forEach { (location, element) ->
                 try {
                     if (element.isJsonArray) {
@@ -153,22 +166,39 @@ object MassDatapackResolver : BlockStateInfoProvider {
             }
         }
 
-        private fun parse(element: JsonElement, origin: ResourceLocation) {
-            val tag = element.asJsonObject["tag"]?.asString
-            val weight = element.asJsonObject["mass"]?.asDouble
-                ?: throw IllegalArgumentException("No mass in file $origin")
-            val friction = element.asJsonObject["friction"]?.asDouble ?: DEFAULT_FRICTION
-            val elasticity = element.asJsonObject["elasticity"]?.asDouble ?: DEFAULT_ELASTICITY
-
-            val priority = element.asJsonObject["priority"]?.asInt ?: 100
-
-            if (tag != null) {
-                addToBeAddedTags(VSBlockStateInfo(ResourceLocation(tag), priority, weight, friction, elasticity, null))
+        private fun addFluid(info: VSFluidStateInfo) {
+            if(fluidMap.containsKey(info.id)) {
+                if(fluidMap[info.id]!!.priority < info.priority) {
+                    fluidMap[info.id] = info
+                }
             } else {
-                val block = element.asJsonObject["block"]?.asString
-                    ?: throw IllegalArgumentException("No block or tag in file $origin")
+                fluidMap[info.id] = info
+            }
+        }
 
-                add(VSBlockStateInfo(ResourceLocation(block), priority, weight, friction, elasticity, null))
+        private fun parse(element: JsonElement, origin: ResourceLocation) {
+            val jsonObject = element.asJsonObject
+            val tag = jsonObject["tag"]?.asString
+            val block = jsonObject["block"]?.asString
+            val fluid = jsonObject["fluid"]?.asString
+            val priority = jsonObject["priority"]?.asInt ?: 100
+
+            fun createBlockStateInfo(resourceLocation: ResourceLocation): VSBlockStateInfo {
+                val weight = jsonObject["mass"]?.asDouble ?: DEFAULT_MASS
+                val friction = jsonObject["friction"]?.asDouble ?: DEFAULT_FRICTION
+                val elasticity = jsonObject["elasticity"]?.asDouble ?: DEFAULT_ELASTICITY
+                return VSBlockStateInfo(resourceLocation, priority, weight, friction, elasticity, null)
+            }
+
+            when {
+                tag != null -> addToBeAddedTags(createBlockStateInfo(ResourceLocation(tag)))
+                block != null -> add(createBlockStateInfo(ResourceLocation(block)))
+                fluid != null -> {
+                    val density = jsonObject["density"]?.asFloat ?: DEFAULT_DENSITY
+                    val dragCoefficient = jsonObject["dragCoefficient"]?.asFloat ?: DEFAULT_DRAG_COEFFICIENT
+                    addFluid(VSFluidStateInfo(ResourceLocation(fluid), priority, density, dragCoefficient, null))
+                }
+                else -> throw IllegalArgumentException("No block or tag in file $origin")
             }
         }
     }
@@ -313,7 +343,7 @@ object MassDatapackResolver : BlockStateInfoProvider {
             // region Add default water/lava liquid block states
             val waterBlockState = Lod1LiquidBlockState(
                 boundingBox = fullLodBoundingBox,
-                density = 1000.0f,
+                density = 100.0f,
                 dragCoefficient = 0.3f,
                 fluidVel = Vector3f(),
                 lod1LiquidBlockStateId = BlockTypeImpl.WATER.toInt(),
@@ -321,7 +351,7 @@ object MassDatapackResolver : BlockStateInfoProvider {
 
             val lavaBlockState = Lod1LiquidBlockState(
                 boundingBox = fullLodBoundingBox,
-                density = 10000.0f,
+                density = 1000.0f,
                 dragCoefficient = 1.0f,
                 fluidVel = Vector3f(),
                 lod1LiquidBlockStateId = BlockTypeImpl.LAVA.toInt(),
@@ -358,7 +388,6 @@ object MassDatapackResolver : BlockStateInfoProvider {
         var nextVoxelStateId = 4
 
         val generatedCollisionShapesMap = HashMap<VoxelShape, Lod1SolidCollisionShape?>()
-        val liquidMaterialToDensityMap = mapOf(Fluids.WATER to Pair(1000.0f, 0.3f), Fluids.LAVA to Pair(10000.0f, 1.0f), Fluids.FLOWING_WATER to Pair(1000.0f, 0.3f), Fluids.FLOWING_LAVA to Pair(10000.0f, 1.0f))
 
         val fluidStateToBlockTypeMap = HashMap<FluidState, Pair<Lod1LiquidBlockStateId, BlockType>>()
 
@@ -368,12 +397,13 @@ object MassDatapackResolver : BlockStateInfoProvider {
             if (cached != null) return cached
             val maxY = ((fluidState.ownHeight * 16.0).roundToInt() - 1).coerceIn(0, 15).toByte()
             val fluidBox = LodBlockBoundingBox.createVSBoundingBox(0, 0, 0, 15, maxY, 15)
-            if (fluidState.type in liquidMaterialToDensityMap) {
-                val (density, dragCoefficient) = liquidMaterialToDensityMap[fluidState.type]!!
+            val resourceLocation = BuiltInRegistries.FLUID.getKey(fluidState.type)
+            if (fluidMap.containsKey(resourceLocation)) {
+                val info = fluidMap[resourceLocation]
                 val newFluidBlockState = Lod1LiquidBlockState(
                     boundingBox = fluidBox,
-                    density = density,
-                    dragCoefficient = dragCoefficient,
+                    density = info?.density ?: DEFAULT_DENSITY,
+                    dragCoefficient = info?.dragCoefficient ?: DEFAULT_DENSITY,
                     fluidVel = Vector3f(),
                     lod1LiquidBlockStateId = nextFluidId++,
                 )

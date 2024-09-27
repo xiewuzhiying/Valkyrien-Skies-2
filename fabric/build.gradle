@@ -70,6 +70,9 @@ dependencies {
 
     // CC Restitched
     //modImplementation("curse.maven:cc-tweaked-282001:${cc_tweaked_version}")
+    // EMF compat
+    modCompileOnly("curse.maven:entity-model-features-844662:5696901")
+    modCompileOnly("curse.maven:entity-texture-features-fabric-568563:5697084")
 
     // Create compat
     modCompileOnly("com.simibubi.create:create-fabric-${minecraft_version}:${create_fabric_version}") {
